@@ -1,98 +1,139 @@
 use std::f32::consts::PI;
 
 use bevy::input::common_conditions::input_toggle_active;
-use traffic_simulator::{Simulator, road::{RoadNetwork, self}};
+use traffic_simulator::{Simulator, user::RoadUser, road::{RoadNetwork, self}};
 use nalgebra::{Point3, Vector3};
-use bevy::{pbr::CascadeShadowConfigBuilder, render::camera::ScalingMode, prelude::*};
+use bevy::{pbr::CascadeShadowConfigBuilder, prelude::*};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 fn main() {
+    const TIME_STEP: f32 = 1.0 / 60.0;
     App::new()
         .add_plugins(DefaultPlugins)
+        .init_resource::<ResSim>()
         .add_startup_system(setup)
+        .add_system(tick_simulation)
         .add_plugin(
             WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::Escape))
         )
+        .insert_resource(FixedTime::new_from_secs(TIME_STEP))
         .run();
+}
+
+
+
+#[derive(Component)]
+struct Ru(u32);
+
+#[derive(Resource)]
+struct ResSim(Simulator);
+
+impl FromWorld for ResSim {
+    fn from_world(world: &mut World) -> Self {
+        ResSim(Simulator::new(RoadNetwork::new(
+            [
+                (
+                    0,
+                    road::Node::new(
+                        0,
+                        Point3::new(8.0, 0.0, 0.0),
+                        30.0 / 3.6, // 30kph
+                        vec![1],
+                        None,
+                        None,
+                    ),
+                ),
+                (
+                    1,
+                    road::Node::new(
+                        1,
+                        Point3::new(10.0, 0.0, 0.0),
+                        10.0 / 3.6, // 30kph
+                        vec![2, 4],
+                        None,
+                        None,
+                    ),
+                ),
+                (
+                    2,
+                    road::Node::new(
+                        2,
+                        Point3::new(10.5, 1.0, 0.0),
+                        5.0 / 3.6, // 30kph
+                        vec![3],
+                        None,
+                        None,
+                    ),
+                ),
+                (
+                    3,
+                    road::Node::new(
+                        3,
+                        Point3::new(11.0, 20.0, 0.0),
+                        30.0 / 3.6, // 30kph
+                        Vec::new(),
+                        None,
+                        None,
+                    ),
+                ),
+                (
+                    4,
+                    road::Node::new(
+                        4,
+                        Point3::new(10.5, -1.0, 0.0),
+                        5.0 / 3.6, // 30kph
+                        vec![5],
+                        None,
+                        None,
+                    ),
+                ),
+                (
+                    5,
+                    road::Node::new(
+                        5,
+                        Point3::new(11.0, -20.0, 0.0),
+                        30.0 / 3.6, // 30kph
+                        Vec::new(),
+                        None,
+                        None,
+                    ),
+                ),
+            ]
+                .into(),
+        )))
+    }
+}
+
+fn tick_simulation(
+    mut commands: Commands,
+    mut simulator: ResMut<ResSim>,
+    mut ru_query: Query<(&Transform, &Ru)>,
+) {
+    let (transform, id) = ru_query.single_mut();
+    let rn = simulator.0.current_road_users();
+    let ru = rn.iter().find(|ru| ru.id == id);
+    transform = Transform::from_xyz(ru.location().x, ru.location().z, ru.location().y);
+    simulator.0.tick();
 }
 
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut sim: ResMut<ResSim>,
 ) {
-    let simulator = Simulator::new(RoadNetwork::new(
-        [
-            (
-                0,
-                road::Node::new(
-                    0,
-                    Point3::new(8.0, 0.0, 0.0),
-                    30.0 / 3.6, // 30kph
-                    vec![1],
-                    None,
-                    None,
-                ),
-            ),
-            (
-                1,
-                road::Node::new(
-                    1,
-                    Point3::new(10.0, 0.0, 0.0),
-                    10.0 / 3.6, // 30kph
-                    vec![2, 4],
-                    None,
-                    None,
-                ),
-            ),
-            (
-                2,
-                road::Node::new(
-                    2,
-                    Point3::new(10.5, 1.0, 0.0),
-                    5.0 / 3.6, // 30kph
-                    vec![3],
-                    None,
-                    None,
-                ),
-            ),
-            (
-                3,
-                road::Node::new(
-                    3,
-                    Point3::new(11.0, 20.0, 0.0),
-                    30.0 / 3.6, // 30kph
-                    Vec::new(),
-                    None,
-                    None,
-                ),
-            ),
-            (
-                4,
-                road::Node::new(
-                    4,
-                    Point3::new(10.5, -1.0, 0.0),
-                    5.0 / 3.6, // 30kph
-                    vec![5],
-                    None,
-                    None,
-                ),
-            ),
-            (
-                5,
-                road::Node::new(
-                    5,
-                    Point3::new(11.0, -20.0, 0.0),
-                    30.0 / 3.6, // 30kph
-                    Vec::new(),
-                    None,
-                    None,
-                ),
-            ),
-        ]
-            .into(),
+    let mut simulator = &mut sim.0;
+    simulator.add_manual_road_users(RoadUser::new(
+        Point3::new(0.0, 0.0, 0.0),
+        0.0,
+        3.5,
+        5.0,
+        PI / 2.0,
+        0,
+        5,
+        &simulator.road_network(),
     ));
-
+    
     // camera
     commands.spawn(Camera3dBundle {
         transform: Transform::from_xyz(20.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
@@ -107,13 +148,14 @@ fn setup(
     });
 
     // Origin marker
+    /*
     commands.spawn(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Cube { size: 0.2 })),
         material: materials.add(Color::rgb(1.0, 0.0, 0.0).into()),
         transform: Transform::from_xyz(0.0, 0.0, 0.0),
         ..default()
     });
-            
+     */      
     let rn = simulator.road_network();
 
     rn.all_node_ids().for_each(|node_id| {
@@ -127,15 +169,18 @@ fn setup(
         });
     });
 
-    let node = rn.find_node(1);
-    draw_node_marker(&mut commands, &mut meshes, &mut materials, &node);
-    node.next_nodes(rn).for_each(|next_node|{
-        let from = node;
-        let to = next_node;
-        draw_road(&mut commands, &mut meshes, &mut materials, &from, &to);
-        //draw_node_marker(&mut commands, &mut meshes, &mut materials, &next_node);
+    let road_users = simulator.current_road_users();
+    road_users.iter().for_each(|ru| {
+        
+        commands.spawn((PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Cube { size: 0.5 })),
+            material: materials.add(Color::rgb(1.0, 1.0, 0.0).into()),
+            transform: Transform::from_xyz(ru.location().x, ru.location().z, ru.location().y),
+            ..default()
+        }, Ru(ru.id)));
+        
     });
-
+    
     // light
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
