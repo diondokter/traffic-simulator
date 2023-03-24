@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use std::f32::consts::PI;
 
 use bevy::input::common_conditions::input_toggle_active;
 use traffic_simulator::{Simulator, road::{RoadNetwork, self}};
 use nalgebra::{Point3, Vector3};
-use bevy::{render::camera::ScalingMode, prelude::*};
+use bevy::{pbr::CascadeShadowConfigBuilder, render::camera::ScalingMode, prelude::*};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 fn main() {
@@ -21,7 +21,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let rn = RoadNetwork::new(
+    let simulator = Simulator::new(RoadNetwork::new(
         [
             (
                 0,
@@ -91,80 +91,113 @@ fn setup(
             ),
         ]
             .into(),
-    );
+    ));
 
     // camera
     commands.spawn(Camera3dBundle {
-        projection: OrthographicProjection {
-            scale: 5.0,
-            scaling_mode: ScalingMode::FixedVertical(2.0),
-            ..default()
-        }
-        .into(),
-        transform: Transform::from_xyz(5.0, 5.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+        transform: Transform::from_xyz(20.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });
 
     // plane
     commands.spawn(PbrBundle {
-        mesh: meshes.add(shape::Plane::from_size(50.0).into()),
+        mesh: meshes.add(shape::Plane::from_size(500.0).into()),
         material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
         ..default()
     });
-    
-    let node = rn.find_node(0);
-    let node2 = rn.find_node(1);
-    let vec_to: Vector3<f32> = node.vector_to(node2);
 
-    let road_width = 3.0;
+    // Origin marker
+    commands.spawn(PbrBundle {
+        mesh: meshes.add(Mesh::from(shape::Cube { size: 0.2 })),
+        material: materials.add(Color::rgb(1.0, 0.0, 0.0).into()),
+        transform: Transform::from_xyz(0.0, 0.0, 0.0),
+        ..default()
+    });
+            
+    let rn = simulator.road_network();
 
-    let test = vec_to * 0.5;
-    
-    let transform = Transform::from_xyz(node.location().x, node.location().z, node.location().y)
-        .with_translation(Vec3::from_array([test.x, test.z, test.y]))
-        .looking_at((node2.location().x, node2.location().z, node2.location().y).into(), Vec3::new(0.0, 1.0, 0.0));
-        
+    rn.all_node_ids().for_each(|node_id| {
+        let node = rn.find_node(node_id);
+        draw_node_marker(&mut commands, &mut meshes, &mut materials, &node);
+        node.next_nodes(rn).for_each(|next_node|{
+            let from = node;
+            let to = next_node;
+            draw_road(&mut commands, &mut meshes, &mut materials, &from, &to);
+            draw_node_marker(&mut commands, &mut meshes, &mut materials, &next_node);
+        });
+    });
+
+    let node = rn.find_node(1);
+    draw_node_marker(&mut commands, &mut meshes, &mut materials, &node);
+    node.next_nodes(rn).for_each(|next_node|{
+        let from = node;
+        let to = next_node;
+        draw_road(&mut commands, &mut meshes, &mut materials, &from, &to);
+        //draw_node_marker(&mut commands, &mut meshes, &mut materials, &next_node);
+    });
+
+    // light
+    commands.spawn(DirectionalLightBundle {
+        directional_light: DirectionalLight {
+            color: Color::rgb_u8(201, 188, 164),
+            shadows_enabled: true,
+            ..default()
+        },
+        transform: Transform {
+            translation: Vec3::new(0.0, 2.0, 0.0),
+            rotation: Quat::from_rotation_x(-PI / 4.),
+            ..default()
+        },
+        // The default cascade config is designed to handle large scenes.
+        // As this example has a much smaller world, we can tighten the shadow
+        // bounds for better visual quality.
+        cascade_shadow_config: CascadeShadowConfigBuilder {
+            first_cascade_far_bound: 4.0,
+            maximum_distance: 10.0,
+            ..default()
+        }
+        .into(),
+        ..default()
+    });
+}
+
+fn draw_road(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    from: &road::Node,
+    to: &road::Node,
+) {
+    let vec_to: Vector3<f32> = from.vector_to(to);
+    let road_width = 0.6;
     let road_thickness = 0.05;
     let road_length = vec_to.magnitude();
     let road_box = shape::Box::new(road_width, road_thickness, road_length);
-    /*
-    let road_box = shape::Box {
-        min_x: node.location.x,
-        max_x: node2.location.x,
-        min_y: node.location.z,
-        max_y: node2.location.z,
-        min_z: node.location.y,
-        max_z: node2.location.y,
-    };
-    */
+    let move_vec = vec_to * 0.5;
+    let translation = from.location() + move_vec;
+
+    let transform = Transform::from_xyz(translation.x, translation.z, translation.y)
+        .looking_at((to.location().x, to.location().z, to.location().y).into(), Vec3::Y);
+
     // Road
     commands.spawn(PbrBundle {
         mesh: meshes.add(Mesh::from(road_box)),
         material: materials.add(Color::rgb(0.2, 0.2, 0.2).into()),
         transform,
         ..default()
-    });
+    });    
+}
 
-    
-    // cubes
+fn draw_node_marker(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    node: &road::Node
+) {
     commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Cube { size: 0.1 })),
+        mesh: meshes.add(Mesh::from(shape::Cube { size: 0.2 })),
         material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
         transform: Transform::from_xyz(node.location().x, node.location().z, node.location().y),
-        ..default()
-    });
-
-    // cubes
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Cube { size: 0.1 })),
-        material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-        transform: Transform::from_xyz(node2.location().x, node2.location().z, node2.location().y),
-        ..default()
-    });
-    
-    // light
-    commands.spawn(PointLightBundle {
-        transform: Transform::from_xyz(3.0, 8.0, 5.0),
         ..default()
     });
 }
