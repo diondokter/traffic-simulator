@@ -163,7 +163,7 @@ mod tests {
 
         let mut current_time = 0.0;
         const DELTA_TIME: f32 = 0.01;
-        for i in 0..1200 {
+        for i in 0..2000 {
             if i % 10 == 0 {
                 println!("Current time: {current_time}");
 

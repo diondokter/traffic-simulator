@@ -111,7 +111,7 @@ impl RoadUser {
             }
 
             let distance_to_traffic_light =
-                (self.location - network.find_node(self.next_nodes[0]).location()).magnitude()
+                ((self.location - network.find_node(self.next_nodes[0]).location()).magnitude()
                     + self
                         .next_nodes
                         .windows(2)
@@ -121,7 +121,7 @@ impl RoadUser {
                                 .find_node(next_nodes[0])
                                 .distance_to(network.find_node(next_nodes[1]))
                         })
-                        .sum::<f32>();
+                        .sum::<f32>() - 0.1).max(0.0);
 
             let time_desired_to_break = self.current_speed / (self.deceleration / 1.5);
             let distance_desired_to_break = self.current_speed / 2.0 * time_desired_to_break;
@@ -129,23 +129,15 @@ impl RoadUser {
             let time_required_to_break = self.current_speed / self.deceleration;
             let distance_required_to_break = self.current_speed / 2.0 * time_required_to_break;
 
-            if distance_to_traffic_light >= distance_desired_to_break {
-                break 'traffic_light_speed false;
-            }
-
             if distance_to_traffic_light < distance_required_to_break
                 && first_next_traffic_light.get_state() == TrafficLightState::Orange
             {
                 break 'traffic_light_speed false;
             }
 
-            if distance_to_traffic_light < distance_required_to_break {
+            if distance_to_traffic_light < distance_desired_to_break {
                 target_speed = 0.0;
-            } else {
-                target_speed = distance_to_traffic_light / time_desired_to_break;
             }
-
-            println!("{target_speed}, distance_to_traffic_light: {distance_to_traffic_light}, distance_desired_to_break: {distance_desired_to_break}, distance_required_to_break: {distance_required_to_break}");
 
             true
         };
@@ -169,9 +161,9 @@ impl RoadUser {
 
         let speed_difference = target_speed - self.current_speed;
         if self.current_speed < target_speed {
-            self.current_speed += (self.acceleration * delta_time).min(speed_difference);
+            self.current_speed += (self.acceleration * delta_time).min(speed_difference).max(0.0);
         } else if self.current_speed > target_speed {
-            self.current_speed -= (self.deceleration * delta_time).max(speed_difference);
+            self.current_speed -= (self.deceleration * delta_time).max(speed_difference).max(0.0);
         }
 
         self.location += self.current_direction * self.current_speed * delta_time;
