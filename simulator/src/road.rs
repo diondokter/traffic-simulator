@@ -1,17 +1,14 @@
 use nalgebra::{Point3, Vector3};
-use std::collections::HashMap;
+use ordered_float::OrderedFloat;
+use std::{collections::HashMap, hash::Hash};
 
 pub struct RoadNetwork {
     nodes: HashMap<u32, Node>,
 }
 
 impl RoadNetwork {
-    pub fn new(
-        nodes: HashMap<u32, Node>,
-    ) -> Self {
-        Self {
-            nodes,
-        }
+    pub fn new(nodes: HashMap<u32, Node>) -> Self {
+        Self { nodes }
     }
 
     pub fn find_node(&self, id: u32) -> &Node {
@@ -23,10 +20,11 @@ impl RoadNetwork {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Node {
-    pub location: Point3<f32>, // 1 unit = 1 meter
-    pub max_speed: f32, // m/s
+    pub id: u32,
+    location: Point3<OrderedFloat<f32>>, // 1 unit = 1 meter
+    max_speed: OrderedFloat<f32>,        // m/s
 
     next_nodes: Vec<u32>,
     adjacent_node_right: Option<u32>,
@@ -35,6 +33,8 @@ pub struct Node {
 
 impl Node {
     pub fn new(
+        id: u32,
+
         location: Point3<f32>,
         max_speed: f32,
 
@@ -43,8 +43,10 @@ impl Node {
         adjacent_node_left: Option<u32>,
     ) -> Self {
         Self {
-            location,
-            max_speed,
+            id,
+
+            location: Point3::new(location.x.into(), location.y.into(), location.z.into()),
+            max_speed: max_speed.into(),
 
             next_nodes,
             adjacent_node_right,
@@ -57,6 +59,14 @@ impl Node {
         network: &'rn RoadNetwork,
     ) -> impl Iterator<Item = &'rn Node> + '_ {
         self.next_nodes.iter().map(move |id| network.find_node(*id))
+    }
+
+    pub fn location(&self) -> Point3<f32> {
+        Point3::new(self.location.x.0, self.location.y.0, self.location.z.0)
+    }
+
+    pub fn max_speed(&self) -> f32 {
+        self.max_speed.0
     }
 
     pub fn adjacent_node_right<'rn>(&self, network: &'rn RoadNetwork) -> Option<&'rn Node> {
@@ -74,7 +84,7 @@ impl Node {
 
     /// The full vector from this node to the given node
     pub fn vector_to(&self, other: &Node) -> Vector3<f32> {
-        other.location - self.location
+        other.location() - self.location()
     }
 
     /// The direction (normalized vector) from this node to the given node

@@ -21,6 +21,78 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    let rn = RoadNetwork::new(
+        [
+            (
+                0,
+                road::Node::new(
+                    0,
+                    Point3::new(8.0, 0.0, 0.0),
+                    30.0 / 3.6, // 30kph
+                    vec![1],
+                    None,
+                    None,
+                ),
+            ),
+            (
+                1,
+                road::Node::new(
+                    1,
+                    Point3::new(10.0, 0.0, 0.0),
+                    10.0 / 3.6, // 30kph
+                    vec![2, 4],
+                    None,
+                    None,
+                ),
+            ),
+            (
+                2,
+                road::Node::new(
+                    2,
+                    Point3::new(10.5, 1.0, 0.0),
+                    5.0 / 3.6, // 30kph
+                    vec![3],
+                    None,
+                    None,
+                ),
+            ),
+            (
+                3,
+                road::Node::new(
+                    3,
+                    Point3::new(11.0, 20.0, 0.0),
+                    30.0 / 3.6, // 30kph
+                    Vec::new(),
+                    None,
+                    None,
+                ),
+            ),
+            (
+                4,
+                road::Node::new(
+                    4,
+                    Point3::new(10.5, -1.0, 0.0),
+                    5.0 / 3.6, // 30kph
+                    vec![5],
+                    None,
+                    None,
+                ),
+            ),
+            (
+                5,
+                road::Node::new(
+                    5,
+                    Point3::new(11.0, -20.0, 0.0),
+                    30.0 / 3.6, // 30kph
+                    Vec::new(),
+                    None,
+                    None,
+                ),
+            ),
+        ]
+            .into(),
+    );
+
     // camera
     commands.spawn(Camera3dBundle {
         projection: OrthographicProjection {
@@ -39,28 +111,6 @@ fn setup(
         material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
         ..default()
     });
-
-    let mut nodes = HashMap::new();
-    nodes.insert(0, road::Node::new(
-        Point3::new(0.0, 0.0, 0.0),
-        8.3,
-        vec![1],
-        None,
-        None,
-        
-    ));
-
-    nodes.insert(1, road::Node::new(
-        Point3::new(5.0, 3.0, 0.0),
-        8.3,
-        vec![1],
-        None,
-        None,
-        
-    ));
-
-    let rn = RoadNetwork::new(nodes);
-    //let sim = Simulator::new(rn);
     
     let node = rn.find_node(0);
     let node2 = rn.find_node(1);
@@ -70,9 +120,9 @@ fn setup(
 
     let test = vec_to * 0.5;
     
-    let transform = Transform::from_xyz(node.location.x, node.location.z, node.location.y)
+    let transform = Transform::from_xyz(node.location().x, node.location().z, node.location().y)
         .with_translation(Vec3::from_array([test.x, test.z, test.y]))
-        .looking_at((node2.location.x, node2.location.z, node2.location.y).into(), Vec3::new(0.0, 1.0, 0.0));
+        .looking_at((node2.location().x, node2.location().z, node2.location().y).into(), Vec3::new(0.0, 1.0, 0.0));
         
     let road_thickness = 0.05;
     let road_length = vec_to.magnitude();
@@ -100,7 +150,7 @@ fn setup(
     commands.spawn(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Cube { size: 0.1 })),
         material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-        transform: Transform::from_xyz(node.location.x, node.location.z, node.location.y),
+        transform: Transform::from_xyz(node.location().x, node.location().z, node.location().y),
         ..default()
     });
 
@@ -108,7 +158,7 @@ fn setup(
     commands.spawn(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Cube { size: 0.1 })),
         material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-        transform: Transform::from_xyz(node2.location.x, node2.location.z, node2.location.y),
+        transform: Transform::from_xyz(node2.location().x, node2.location().z, node2.location().y),
         ..default()
     });
     
