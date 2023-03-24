@@ -106,13 +106,14 @@ impl FromWorld for ResSim {
 
 fn tick_simulation(
     mut commands: Commands,
-    mut simulator: Res<ResSim>,
-    mut ru_query: Query<(&Transform, Ru)>,
+    mut simulator: ResMut<ResSim>,
+    mut ru_query: Query<(&Transform, &Ru)>,
 ) {
     let (transform, id) = ru_query.single_mut();
     let rn = simulator.0.current_road_users();
-    rn.iter().find(|ru| ru.id == id);
-    ru_transform = Transform::from_xyz(ru.location().x, ru.location().z, ru.location().y);
+    let ru = rn.iter().find(|ru| ru.id == id);
+    transform = Transform::from_xyz(ru.location().x, ru.location().z, ru.location().y);
+    simulator.0.tick();
 }
 
 fn setup(
@@ -176,7 +177,7 @@ fn setup(
             material: materials.add(Color::rgb(1.0, 1.0, 0.0).into()),
             transform: Transform::from_xyz(ru.location().x, ru.location().z, ru.location().y),
             ..default()
-        }, Ru));
+        }, Ru(ru.id)));
         
     });
     
