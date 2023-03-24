@@ -21,6 +21,18 @@ impl Simulator {
         self.current_road_users
             .retain_mut(|user| user.tick(&self.road_network, delta_time));
     }
+
+    pub fn road_network(&self) -> &RoadNetwork {
+        &self.road_network
+    }
+
+    pub fn current_road_users(&self) -> &[RoadUser] {
+        self.current_road_users.as_ref()
+    }
+
+    pub fn add_manual_road_users(&mut self, user: RoadUser) {
+        self.current_road_users.push(user)
+    }
 }
 
 #[cfg(test)]
