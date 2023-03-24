@@ -1,14 +1,23 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+use road::RoadNetwork;
+use user::RoadUser;
+
+pub mod road;
+pub mod user;
+
+pub struct Simulator {
+    road_network: RoadNetwork,
+    current_road_users: Vec<RoadUser>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+impl Simulator {
+    pub fn new(road_network: RoadNetwork) -> Self {
+        Self {
+            road_network,
+            current_road_users: Vec::new(),
+        }
+    }
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+    pub fn tick(&mut self, delta_time: f32) {
+        
     }
 }
